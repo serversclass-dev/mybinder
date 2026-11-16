@@ -1,0 +1,14 @@
+{
+  "commands": [
+    {
+      "id": "e415d14d-ede5-4a32-850d-c07278527024",
+      "label": "replit visit",
+      "cmd": "cd /home/runner/workspace/replit_visit && ./run_bg.sh",
+      "enabled": true,
+      "created": "2026-09-24T11:49:23",
+      "last_run": "2026-11-16T22:34:41",
+      "last_output": "[+] Bot started in background!\n[+] PID : 788\n[+] Log : /home/runner/workspace/replit_visit/bot.log\n\n  Watch logs : tail -f /home/runner/workspace/replit_visit/bot.log\n  Stop bot   : ./stop.sh",
+      "last_status": 0
+    }
+  ]
+}
