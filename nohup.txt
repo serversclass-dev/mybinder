@@ -1,0 +1,7 @@
+nohup python3 app.py > app.log 2>&1 &
+
+nohup ssh -p 443 -R0:localhost:5011 \
+-o StrictHostKeyChecking=no \
+-o ServerAliveInterval=30 \
+mQrBzVhX3JM@us.free.pinggy.io \
+> pinggy.log 2>&1 < /dev/null &
