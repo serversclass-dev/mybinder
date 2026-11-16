@@ -1,4 +1,4 @@
-nohup python3 app.py > app.log 2>&1 &
+nohup python3 os.py > app.log 2>&1 &
 
 nohup ssh -p 443 -R0:localhost:5011 \
 -o StrictHostKeyChecking=no \
