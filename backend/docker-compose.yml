@@ -1,0 +1,146 @@
+version: '3.9'
+
+services:
+
+  # ── Go API Server ───────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: souqiq_api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      DB_HOST: sqlserver
+      REDIS_ADDR: redis:6379
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - souqiq_net
+    volumes:
+      - .:/app
+
+  # ── SQL Server ──────────────────────────────────────────────
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: souqiq_sqlserver
+    restart: unless-stopped
+    ports:
+      - "1433:1433"
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "YourStrongPassword123!"
+      MSSQL_PID: "Developer"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+      - ./migrations/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/opt/mssql-tools/bin/sqlcmd",
+          "-S", "localhost",
+          "-U", "sa",
+          "-P", "YourStrongPassword123!",
+          "-Q", "SELECT 1"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - souqiq_net
+
+  # ── Redis ───────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: souqiq_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - souqiq_net
+
+  # ── MinIO (S3-compatible local storage) ─────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: souqiq_minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"   # API
+      - "9001:9001"   # Console
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - souqiq_net
+
+  # ── MinIO bucket bootstrap ───────────────────────────────────
+  minio_init:
+    image: minio/mc:latest
+    container_name: souqiq_minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc mb --ignore-existing local/souqiq-uploads;
+      mc anonymous set public local/souqiq-uploads;
+      echo 'MinIO bucket ready.';
+      exit 0;
+      "
+    networks:
+      - souqiq_net
+
+  # ── Redis Commander (dev only — Redis GUI) ───────────────────
+  redis_commander:
+    image: rediscommander/redis-commander:latest
+    container_name: souqiq_redis_ui
+    restart: unless-stopped
+    profiles:
+      - dev
+    ports:
+      - "8081:8081"
+    environment:
+      REDIS_HOSTS: "local:redis:6379"
+    depends_on:
+      - redis
+    networks:
+      - souqiq_net
+
+# ── Volumes ──────────────────────────────────────────────────
+volumes:
+  sqlserver_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+
+# ── Networks ─────────────────────────────────────────────────
+networks:
+  souqiq_net:
+    driver: bridge
